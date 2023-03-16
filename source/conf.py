@@ -15,7 +15,7 @@ release = 'v1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['chinese_search', 'sphinx.ext.mathjax', 'sphinx_sitemap', 'sphinx_multiversion']
+#extensions = ['chinese_search', 'sphinx.ext.mathjax', 'sphinx_sitemap', 'sphinx_multiversion']
 # extensions = ['myst_parser']
 
 source_suffix = {
