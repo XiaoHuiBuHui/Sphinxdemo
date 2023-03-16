@@ -1,0 +1,652 @@
+
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>网关鉴权签名示例 &#8212; Avata v1.0 文档</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="错误码汇总" href="second6.html" />
+    <link rel="prev" title="接入参数示例" href="second4.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="id1">
+<h1>网关鉴权签名示例<a class="headerlink" href="#id1" title="此标题的永久链接">¶</a></h1>
+<section id="go">
+<h2>签名示例 - Go 语言版本：<a class="headerlink" href="#go" title="此标题的永久链接">¶</a></h2>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>package main
+
+import (
+  &quot;bytes&quot;
+  &quot;crypto/sha256&quot;
+  &quot;encoding/hex&quot;
+  &quot;encoding/json&quot;
+  &quot;fmt&quot;
+  &quot;io/ioutil&quot;
+  &quot;net/http&quot;
+)
+
+// SignRequest 对请求进行签名
+func SignRequest(r *http.Request, apiKey, apiSecret string) *http.Request {
+  timestamp := strconv.FormatInt(time.Now().Unix() * 1000, 10)
+  // 获取 path params
+  params := map[string]interface{}{}
+  params[&quot;path_url&quot;] = r.URL.Path
+  // 获取 query params
+  for k, v := range r.URL.Query() {
+    k = &quot;query_&quot; + k
+    params[k] = v[0]
+  }
+  // 获取 body params
+  // 把request的内容读取出来
+  var bodyBytes []byte
+  if r.Body != nil {
+    bodyBytes, _ = ioutil.ReadAll(r.Body)
+  }
+  // 把刚刚读出来的再写进去
+  if bodyBytes != nil {
+    r.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+  }
+  paramsBody := map[string]interface{}{}
+  _ = json.Unmarshal(bodyBytes, &amp;paramsBody)
+  hexHash := hash(timestamp + apiSecret)
+  for k, v := range paramsBody {
+    k = &quot;body_&quot; + k
+    params[k] = v
+  }
+  sortParams := params
+  if sortParams != nil {
+    bf := bytes.NewBuffer([]byte{})
+    jsonEncoder := json.NewEncoder(bf)
+    jsonEncoder.SetEscapeHTML(false)
+    jsonEncoder.Encode(sortParams)
+
+    hexHash = hash(strings.TrimRight(bf.String(), &quot;\n&quot;) + timestamp + apiSecret)
+  }
+  r.Header.Set(&quot;X-Api-Key&quot;, apiKey)
+  r.Header.Set(&quot;X-Signature&quot;, hexHash)
+  r.Header.Set(&quot;X-Timestamp&quot;, timestamp)
+  return r
+}
+func hash(oriText string) string {
+  oriTextHashBytes := sha256.Sum256([]byte(oriText))
+  return hex.EncodeToString(oriTextHashBytes[:])
+}
+</pre></div>
+</div>
+</section>
+<section id="java">
+<h2>签名示例 - Java 语言版本：<a class="headerlink" href="#java" title="此标题的永久链接">¶</a></h2>
+<blockquote>
+<div><p>Java签名示例的依赖以及版本号</p>
+</div></blockquote>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;dependency&gt;
+    &lt;groupId&gt;com.alibaba&lt;/groupId&gt;
+    &lt;artifactId&gt;fastjson&lt;/artifactId&gt;
+    &lt;version&gt;1.2.79&lt;/version&gt;
+&lt;/dependency&gt;
+
+package ai.bianjie.avata.auth;
+
+
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.serializer.SerializerFeature;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
+
+public class AvataUtils {
+
+    /**
+    * 对请求参数进行签名处理
+    *
+    * @param path      请求路径，仅截取域名后及 Query 参数前部分，例：&quot;/v1beta1/accounts&quot;;
+    * @param query     Query 参数，例：&quot;key1=value1&amp;key2=value2&quot;，需转为 Map 格式
+    * @param body      Body 参数，例：&quot;{\&quot;count\&quot;: 1, \&quot;operation_id\&quot;: \&quot;random_string\&quot;}&quot;，需转为 Map 格式
+    * @param timestamp 当前时间戳（毫秒），例：1647751123703
+    * @param apiSecret 应用方的 API Secret，例：&quot;AKIDz8krbsJ5yKBZQpn74WFkmLPc5ab&quot;
+    * @return 返回签名结果
+    */
+    public static String signRequest(String path, Map&lt;String, Object&gt; query, Map&lt;String, Object&gt; body, long timestamp, String apiSecret) {
+        Map&lt;String, Object&gt; paramsMap = new HashMap();
+
+        paramsMap.put(&quot;path_url&quot;, path);
+
+        if (query != null &amp;&amp; !query.isEmpty()) {
+            query.forEach((key, value) -&gt; paramsMap.put(&quot;query_&quot; + key, value));
+        }
+
+        if (body != null &amp;&amp; !body.isEmpty()) {
+            body.forEach((key, value) -&gt; paramsMap.put(&quot;body_&quot; + key, value));
+        }
+
+        // 重要提示：下载相应的依赖，请使用上方Java代码前的版本号
+
+        // 将请求参数序列化为排序后的 JSON 字符串
+        String jsonStr = JSON.toJSONString(paramsMap, SerializerFeature.MapSortField);
+
+        // 执行签名
+        String signature = sha256Sum(jsonStr + String.valueOf(timestamp) + apiSecret);
+
+        return signature;
+    }
+
+    /**
+    * SHA256 摘要
+    *
+    * @param str
+    * @return
+    */
+    private static String sha256Sum(String str) {
+        MessageDigest digest = null;
+        try {
+            digest = MessageDigest.getInstance(&quot;SHA-256&quot;);
+        } catch (NoSuchAlgorithmException e) {
+            // Should not happen
+            e.printStackTrace();
+        }
+        byte[] encodedHash = digest.digest(str.getBytes(StandardCharsets.UTF_8));
+        return bytesToHex(encodedHash);
+    }
+
+    /**
+    * 将 bytes 转为 Hex
+    *
+    * @param hash
+    * @return
+    */
+    private static String bytesToHex(byte[] hash) {
+        StringBuilder hexString = new StringBuilder(2 * hash.length);
+        for (int i = 0; i &lt; hash.length; i++) {
+            String hex = Integer.toHexString(0xff &amp; hash[i]);
+            if (hex.length() == 1) {
+                hexString.append(&#39;0&#39;);
+            }
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+}
+</pre></div>
+</div>
+</section>
+<section id="php">
+<h2>签名示例 - PHP 语言版本：<a class="headerlink" href="#php" title="此标题的永久链接">¶</a></h2>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;?php
+
+class ApiClient
+{
+    private $apiKey = &quot;apiKey&quot;;
+    private $apiSecret = &quot;apiSecret&quot;;
+    private $domain = &quot;https://stage.apis.avata.bianjie.ai&quot;;//test
+
+    // post请求示例
+    // 创建链账户示例
+    function CreateChainAccount()
+    {
+
+        $body = [
+            &quot;name&quot; =&gt; &quot;test&quot;,
+            &quot;operation_id&quot; =&gt; &quot;operationid&quot; . $this-&gt;getMillisecond(),
+        ];
+
+        $res = $this-&gt;request(&quot;/v1beta1/account&quot;, [], $body, &quot;POST&quot;);
+        var_dump($res);
+    }
+
+    // get请求示例
+    // 查询链账户
+    function QueryChainAccount(){
+        $query = [
+            &quot;name&quot; =&gt; &quot;test&quot;,
+            &quot;operation_id&quot; =&gt; &quot;operationid1653551871&quot;, // the CreateChainAccount use operation_id
+        ];
+
+        $res = $this-&gt;request(&quot;/v1beta1/accounts&quot;, $query, [], &quot;GET&quot;);
+        var_dump($res);
+    }
+
+
+    function request($path, $query = [], $body = [], $method = &#39;GET&#39;)
+    {
+        $method = strtoupper($method);
+        $apiGateway = rtrim($this-&gt;domain, &#39;/&#39;) . &#39;/&#39; . ltrim($path,
+                &#39;/&#39;) . ($query ? &#39;?&#39; . http_build_query($query) : &#39;&#39;);
+        $timestamp = $this-&gt;getMillisecond();
+        $params = [&quot;path_url&quot; =&gt; $path];
+        if ($query) {
+            // 组装 query
+            foreach ($query as $k =&gt; $v) {
+                $params[&quot;query_{$k}&quot;] = $v;
+            }
+        }
+        if ($body) {
+            // 组装 post body
+            foreach ($body as $k =&gt; $v) {
+                $params[&quot;body_{$k}&quot;] = $v;
+            }
+        }
+        // 数组递归排序
+        $this-&gt;SortAll($params);
+        $hexHash = hash(&quot;sha256&quot;, &quot;{$timestamp}&quot; . $this-&gt;apiSecret);
+        if (count($params) &gt; 0) {
+            // 序列化且不编码
+            $s = json_encode($params,JSON_UNESCAPED_UNICODE);
+            $hexHash = hash(&quot;sha256&quot;, stripcslashes($s . &quot;{$timestamp}&quot; . $this-&gt;apiSecret));
+        }
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $apiGateway);
+        $header = [
+            &quot;Content-Type:application/json&quot;,
+            &quot;X-Api-Key:{$this-&gt;apiKey}&quot;,
+            &quot;X-Signature:{$hexHash}&quot;,
+            &quot;X-Timestamp:{$timestamp}&quot;,
+        ];
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $header);
+        $jsonStr = $body ? json_encode($body) : &#39;&#39;; //转换为json格式
+        if ($method == &#39;POST&#39;) {
+            curl_setopt($ch, CURLOPT_POST, 1);
+            if ($jsonStr) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonStr);
+            }
+        } elseif ($method == &#39;PATCH&#39;) {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, &#39;PATCH&#39;);
+            if ($jsonStr) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonStr);
+            }
+        } elseif ($method == &#39;PUT&#39;) {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, &#39;PUT&#39;);
+            if ($jsonStr) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonStr);
+            }
+        } elseif ($method == &#39;DELETE&#39;) {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, &#39;DELETE&#39;);
+            if ($jsonStr) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonStr);
+            }
+        }
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        $response = curl_exec($ch);
+        curl_close($ch);
+        $response = json_decode($response, true);
+
+       /*
+        * 部分PHP版本curl默认不验证https证书，返回NULL,可添加以下配置或更换版本尝试
+        * curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        * curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, true);
+        * //默认验证正规CA颁发的https证书
+        *
+        * */
+
+        return $response;
+
+    }
+
+
+    function SortAll(&amp;$params){
+        if (is_array($params)) {
+            ksort($params);
+        }
+        foreach ($params as &amp;$v){
+            if (is_array($v)) {
+                $this-&gt;SortAll($v);
+            }
+        }
+    }
+
+    /** get timestamp
+     *
+     * @return float
+     */
+    private function getMillisecond()
+    {
+        list($t1, $t2) = explode(&#39; &#39;, microtime());
+        return (float)sprintf(&#39;%.0f&#39;, (floatval($t1) + floatval($t2)));
+    }
+
+}
+
+$cls = new ApiClient();
+$cls-&gt;CreateChainAccount();
+// $cls-&gt;QueryChainAccount();
+
+?&gt;
+</pre></div>
+</div>
+</section>
+<section id="python">
+<h2>签名示例 - Python 语言版本：<a class="headerlink" href="#python" title="此标题的永久链接">¶</a></h2>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  # coding=utf8
+      import time
+      import json
+      import hashlib
+
+      import requests
+
+
+      class Sign(object):
+          def __init__(self):
+              # 获取当前时间戳
+              self.t = time.time()
+              self.timestamp = str(round(self.t * 1000))
+              self.headers_Content_Type = {&quot;Content-Type&quot;: &#39;application/json&#39;, &#39;X-Api-Key&#39;: &#39;API-Key&#39;}
+              # 创建链账户接口
+              self.interface_create_account = {&#39;url&#39;: &#39;/v1beta1/account&#39;}
+              # 查询链账户接口
+              self.interface_query_account = {&#39;url&#39;: &#39;/v1beta1/accounts&#39;}
+              # 应用方的api_secret
+              self.apiSecret = &#39;API-Serect&#39;
+              self.url = &#39;https://stage.apis.avata.bianjie.ai&#39;
+
+          def body_params(self, params):
+              body_params = {}
+              for key in params.keys():
+                  value = params[key]
+                  key = &#39;body_&#39; + key
+                  body_params.update({key: value})
+              return body_params
+
+          def query_params(self, params):
+              query_params = {}
+              for key in params.keys():
+                  value = params[key]
+                  key = &#39;query_&#39; + key
+                  query_params.update({key: value})
+              return query_params
+
+          def path_params(self, params):
+              path_params = {}
+              for key in params.keys():
+                  value = params[key]
+                  key = &#39;path_&#39; + key
+                  path_params.update({key: value})
+              return path_params
+
+          def sign(self, params):
+              # params进行序列化
+              # separators 去空格  sort_keys 按 key 排序
+              # ensure_ascii=False 解决中文乱码
+              sortParams = json.dumps(params, separators=(&#39;,&#39;, &#39;:&#39;), sort_keys=True, ensure_ascii=False)
+              str = (sortParams + self.timestamp + self.apiSecret).encode(&quot;utf-8&quot;)
+              hexHash = hashlib.sha256(str).hexdigest()
+              return hexHash
+
+          def request(self, method, path_url, params, headers):
+              result = None
+              if method == &#39;GET&#39;:
+                  result = requests.get(self.url + path_url, params=params, headers=headers).json()
+                  print(result)
+                  return result
+              elif method == &#39;POST&#39;:
+                  result = requests.post(self.url + path_url, json=params, headers=headers).json()
+                  print(result)
+                  return result
+              elif method == &#39;DELETE&#39;:
+                  result = requests.delete(self.url + path_url, json=params, headers=headers).json()
+                  print(result)
+                  return result
+              elif method == &#39;PATCH&#39;:
+                  result = requests.patch(self.url + path_url, json=params, headers=headers).json()
+                  print(result)
+                  return result
+              else:
+                  print(&quot;method error&quot;)
+              return result
+
+          # 创建链账户
+          def test_create_account(self):
+              print(&quot;当前执行的模块是---创建链账户&quot;)
+              params_create_account = {
+                  &quot;name&quot;: &#39;创建链账户的名称&#39;,
+                  &quot;operation_id&quot;: self.timestamp
+              }
+              print(params_create_account)
+              signature_params = Sign().body_params(params_create_account)
+              signature_params.update(Sign().path_params(self.interface_create_account))
+              self.headers_Content_Type.update({&#39;X-Timestamp&#39;: self.timestamp, &#39;X-Signature&#39;: Sign().sign(signature_params)})
+              print(self.headers_Content_Type)
+              return self.headers_Content_Type, params_create_account
+
+          # 查询链账户
+          def test_query_account(self):
+              print(&quot;当前执行的模块是---查询链账户&quot;)
+              params_query_account = {
+                  # &#39;limit&#39;:&#39;50&#39;,
+                  # &quot;offset&quot;:&quot;0&quot;,
+                  # &quot;start_date&quot;:&quot;2022-03-28&quot;,
+                  # &#39;end_date&#39;:&quot;2022-05-01&quot;,
+                  # &quot;sort_by&quot;:&quot;DATE_ASC&quot;,
+                  # &#39;account&#39;:&#39;&#39;,
+                  # &#39;name&#39;:&quot;&quot;
+              }
+              print(params_query_account)
+              signature_params = Sign().query_params(params_query_account)
+              signature_params.update(Sign().path_params(self.interface_query_account))
+              self.headers_Content_Type.update({&#39;X-Timestamp&#39;: self.timestamp, &#39;X-Signature&#39;: Sign().sign(signature_params)})
+              print(self.headers_Content_Type)
+              return self.headers_Content_Type, params_query_account
+
+
+      if __name__ == &#39;__main__&#39;:
+          # 查询链账户
+          # result = Sign().test_query_account()
+          # headers = result[0]
+          # params = result[1]
+          # Sign().request(&#39;GET&#39;, &#39;/v1beta1/accounts&#39;, params, headers)
+
+          # 创建链账户
+          result = Sign().test_create_account()
+          headers = result[0]
+          params = result[1]
+          Sign().request(&#39;POST&#39;, &#39;/v1beta1/account&#39;, params, headers)
+</pre></div>
+</div>
+</section>
+<section id="c">
+<h2>签名示例 - C# 语言版本：<a class="headerlink" href="#c" title="此标题的永久链接">¶</a></h2>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>using System;
+using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
+using Newtonsoft.Json;
+
+namespace Flow.Avata
+{
+    public class AvataUitl
+    {
+        public static string apiSecret = &quot;apiKey&quot;;
+        public static string apiKey = &quot;apiSecret&quot;;
+        public static string domain = &quot;https://stage.apis.avata.bianjie.ai&quot;;
+
+        /**
+          * 对请求参数进行签名处理
+          *
+          * @param path      请求路径，仅截取域名后及 Query 参数前部分，例：&quot;/v1beta1/accounts&quot;;
+          * @param query     Query 参数，例：&quot;key1=value1&amp;key2=value2&quot;，需转为 Map 格式
+          * @param body      Body 参数，例：&quot;{\&quot;count\&quot;: 1, \&quot;operation_id\&quot;: \&quot;random_string\&quot;}&quot;，需转为 Map 格式
+          * @param timestamp 当前时间戳（毫秒），例：1647751123703
+          * @param apiSecret 应用方的 API Secret，例：&quot;AKIDz8krbsJ5yKBZQpn74WFkmLPc5ab&quot;
+          * @return 返回签名结果
+          */
+        public static String signRequest(String path, Dictionary&lt;String, Object&gt; query, Dictionary&lt;String, Object&gt; body, long timestamp, String apiSecret)
+        {
+            SortedDictionary&lt;String, Object&gt; paramsMap = new SortedDictionary&lt;String, Object&gt;();
+
+            paramsMap.Add(&quot;path_url&quot;, path);
+
+            if (query != null)
+            {
+                foreach (var key in query)
+                {
+                    paramsMap.Add(&quot;query_&quot; + key.Key, key.Value);
+                }
+
+            }
+
+            if (body != null)
+            {
+                foreach (var key in body)
+                {
+                    paramsMap.Add(&quot;body_&quot; + key.Key, key.Value);
+                }
+            }
+
+            // 将请求参数序列化为排序后的 JSON 字符串
+            String jsonStr = JsonConvert.SerializeObject(paramsMap);
+
+            // 执行签名
+            String signature = sha256Sum(jsonStr + timestamp.ToString() + apiSecret);
+
+            return signature;
+        }
+
+        /**
+        * SHA256 摘要
+        *
+        * @param str
+        * @return
+        */
+        private static String sha256Sum(String str)
+        {
+            SHA256 sha256Generator = SHA256.Create();
+            byte[] sha256HashBytes = sha256Generator.ComputeHash(Encoding.UTF8.GetBytes(str));
+
+            StringBuilder sha256StrBuilder = new StringBuilder();
+            foreach (byte @byte in sha256HashBytes)
+            {
+                sha256StrBuilder.Append(@byte.ToString(&quot;x2&quot;));
+            }
+            return sha256StrBuilder.ToString();
+        }
+
+        /// &lt;summary&gt;From:www.uzhanbao.com
+        /// DateTime转换为13位时间戳（单位：毫秒）
+        /// &lt;/summary&gt;
+        /// &lt;param name=&quot;dateTime&quot;&gt; DateTime&lt;/param&gt;
+        /// &lt;returns&gt;13位时间戳（单位：毫秒）&lt;/returns&gt;
+        public static long DateTimeToLongTimeStamp(DateTime dateTime)
+        {
+            DateTime timeStampStartTime = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            return (long)(dateTime.ToUniversalTime() - timeStampStartTime).TotalMilliseconds;
+            //return 1657338317368;
+        }
+
+        /// &lt;summary&gt;
+        /// POST 请求示例
+        /// 创建链账户
+        /// &lt;/summary&gt;
+        /// &lt;returns&gt;&lt;/returns&gt;
+        public static account Account(string name, string operation_id)
+        {
+            try
+            {
+                string path = &quot;/v1beta1/account&quot;;
+                string url = domain + path;
+
+                Dictionary&lt;string, object&gt; body = new Dictionary&lt;string, object&gt;();
+                body.Add(&quot;name&quot;, name);
+                body.Add(&quot;operation_id&quot;, operation_id);
+
+
+                long Timestamp = DateTimeToLongTimeStamp(DateTime.Now);
+                string Signature = signRequest(path, null, body, Timestamp, apiSecret);
+
+                Dictionary&lt;string, string&gt; header = new Dictionary&lt;string, string&gt;();
+                header.Add(&quot;X-Api-Key&quot;, apiKey);
+                header.Add(&quot;X-Timestamp&quot;, Timestamp.ToString());
+                header.Add(&quot;X-Signature&quot;, Signature);
+
+                string bodyJson = JsonConvert.SerializeObject(body);
+                string ret = HttpHelper.PostData(url, bodyJson, &quot;application/json&quot;, header, null);
+                return JsonConvert.DeserializeObject&lt;account&gt;(ret);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                return null;
+            }
+        }
+
+    /// &lt;summary&gt;
+    /// 创建账号
+    /// &lt;/summary&gt;
+    public class account
+    {
+        public accountData data { get; set; }
+    }
+
+    public class accountData
+    {
+        public string account { get; set; }
+        public string name { get; set; }
+        public string operation_id { get; set; }
+    }
+}
+</pre></div>
+</div>
+</section>
+<section id="node-js">
+<h2>签名示例 - Node.js 语言版本：<a class="headerlink" href="#node-js" title="此标题的永久链接">¶</a></h2>
+<p><a class="reference external" href="https://gist.github.com/chengpeiquan/982fc73eda02178e1a1b1eedcfad9450">https://gist.github.com/chengpeiquan/982fc73eda02178e1a1b1eedcfad9450</a></p>
+<p>以上示例来自文昌链技术交流群「广州反转月球文化有限公司」熊猫当，感谢&#64;熊猫当的技术贡献</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2022, minghui.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/second5.md.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

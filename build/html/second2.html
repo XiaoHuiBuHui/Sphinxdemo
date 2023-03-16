@@ -1,0 +1,182 @@
+
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>底层链 API 接入说明 &#8212; Avata v1.0 文档</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css" />
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/sphinx_highlight.js"></script>
+    <script src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="接口请求说明" href="second3.html" />
+    <link rel="prev" title="Avata API 接入说明" href="second1.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="api">
+<h1>底层链 API 接入说明<a class="headerlink" href="#api" title="此标题的永久链接">¶</a></h1>
+<p>第一步：注册并认证</p>
+<ul class="simple">
+<li><p>1.1 注册并登录 <a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台</a></p></li>
+<li><p>1.2 进行您的 KYC 认证，包括实名认证和企业认证</p></li>
+<li><p>1.3 等待认证审核结果（1-3个工作日），审核通过后可进行项目创建</p></li>
+</ul>
+<p>第二步：创建项目并下载项目参数</p>
+<ul class="simple">
+<li><p>2.1 在 <a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台</a> 进行您的项目创建(选择平台非托管模式)</p></li>
+<li><p>2.2 项目创建完成后，系统会自动生成项目对应的 API 服务参数与，您需下载保存（请仔细保管，谨防丢失）</p></li>
+<li><p>2.3 获取项目参数后，可按照 <a class="reference external" href="http://apis.avata.bianjie.ai">Avata API 服务接口文档</a> 提供的「API 服务网关鉴权签名示例」生成签名参数</p></li>
+<li><p>2.4 在 <a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台</a> 完成企业认证后，系统会自动发放测试环境的项目参数至您的项目列表中，您可下载测试环境的项目参数进行在测试环境中使用</p></li>
+</ul>
+<p>第三步：测试环境及生产环境的底层链 API 初始化配置</p>
+<ul>
+<li><p>3.1 测试环境</p>
+<p>原生模块：</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Chain-ID：testing
+RPC：testnet.bianjie.ai:26657
+gRPC：testnet.bianjie.ai:9090
+</pre></div>
+</div>
+<p>EVM：</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Chain-ID：12231
+RPCAddr: https://evmrpc.testnet.bianjie.ai
+wsAddr: wss://evmws.testnet.bianjie.ai
+</pre></div>
+</div>
+<p>注：测试网没有网关接入要求，开发者可以根据业务需要先在测试网中进行相关应用接口的调试</p>
+</li>
+<li><p>3.2 【文昌链-天舟】生产环境</p>
+<p>原生模块：</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Chain-ID：wenchang-tianzhou
+RPCAddr: https://rpc.tianzhou.wenchang.bianjie.ai
+wsAddr: wss://ws.tianzhou.wenchang.bianjie.ai
+gRPCAddr: grpc.tianzhou.wenchang.bianjie.ai:80
+</pre></div>
+</div>
+<p>EVM：</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Chain-ID：1224
+RPCAddr: https://evmrpc.tianzhou.wenchang.bianjie.ai
+wsAddr: wss://evmws.tianzhou.wenchang.bianjie.ai
+</pre></div>
+</div>
+<p>注： 【文昌链-天舟】生产环境有网关接入要求，开发者在初始化 OPB 网关账号时，须传入项目 Key（之前已下载的项目接入配置参数），用于网关鉴权：</p>
+<ul class="simple">
+<li><p>原生模块：当前版本暂未开启 gRPC TLS，请在使用 OPB SDK 初始化客户端时，关闭 TLS 校验；</p></li>
+<li><p>EVM：使用 Web3 生态工具连接网关，请在 URL 的 Query 参数中传入项目 Key，例： <code class="docutils literal notranslate"><span class="pre">https://evmrpc.tianzhou.wenchang.bianjie.ai?x-api-key=&lt;项目</span> <span class="pre">Key&gt;</span></code></p></li>
+</ul>
+</li>
+<li><p>3.3 【文昌链-天和】生产环境</p>
+<p>注：【文昌链-天和】生产环境有网关接入要求，可参考 <a class="reference external" href="https://www.bsnbase.com/static/tmpFile/bzsc/openper/7-3-1.html">BSN 网关接入说明文档</a></p>
+</li>
+</ul>
+<p>第四步：资金账户充值</p>
+<ul>
+<li><p>4.1 充值方式：</p>
+<p>您可登录 <a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台</a>，在用户中心-我的账户-充值界面进行资金账户充值，Avata 平台目前支持微信支付、支付宝支付、线下汇款三种充值方式</p>
+</li>
+<li><p>4.2 充值说明：</p>
+<p>Avata 平台针对每个用户都提供专属的资金账户。文昌链原生模块上链交易所产生的能量值消耗，都将从您的专属资金账户中支出。您也可以针对不同底层链服务，自主使用您的“资金账户”余额购买平台提供的具体服务，包括但不限于服务包、能量值、业务费等服务</p>
+</li>
+</ul>
+<p>第五步：创建链账户并申请「创建 NFT/MT 类别」权限</p>
+<ul class="simple">
+<li><p>5.1 您可登录 <a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台</a>，在链账户管理-我的链账户界面上传您已经离线创建好的链账户地址</p></li>
+<li><p>5.2 点击链账户列表中的操作项【申请权限】，获取「创建 NFT/MT 类别」权限(授权属于上链交易，需要一定时间等待)</p></li>
+</ul>
+<p>第六步：购买能量值</p>
+<p>能量值消耗费由 BSN 联盟和链技术方共同定义，通过链上编程的方式形成了链上事务级的收费记账单位，单位为 “能量值”。</p>
+<p>有两种扣费方式：</p>
+<ul class="simple">
+<li><p>代付方式：</p>
+<ul>
+<li><p>由某代付链账户授权，其他链账户交易所消耗能量值都由该代付账户统一支付，方便管理；</p></li>
+<li><p>您需要为该代付账户购买能量值，并授权其他链账户代付权限。</p></li>
+</ul>
+</li>
+<li><p>非代付方式：</p>
+<ul>
+<li><p>由各链账户自行支付能量值。</p></li>
+<li><p>您需要为需要交易的链账户购买能量值，并管理各链账户的能量值余额，我们提供批量充值接口。</p></li>
+</ul>
+</li>
+</ul>
+<p>操作方式：</p>
+<ul>
+<li><p>1.购买能量值（控制台与调用接口两种方法均可）</p>
+<ul>
+<li><p>文昌链-天舟：</p>
+<p><a class="reference external" href="https://console.avata.bianjie.ai">Avata 服务平台控制台</a>：链账户管理 - 我的链账户 - 更多 - 能量值购买</p>
+<p><a class="reference external" href="https://apis.avata.bianjie.ai/#tag/%E5%85%85%E5%80%BC%E6%8E%A5%E5%8F%A3/paths/~1v1beta1~1orders/post">调用充值接口</a></p>
+<p><a class="reference external" href="https://apis.avata.bianjie.ai/#tag/%E5%85%85%E5%80%BC%E6%8E%A5%E5%8F%A3/paths/~1v1beta1~1orders~1batch/post">批量充值接口</a></p>
+</li>
+<li><p>文昌链-天和：</p>
+<p>BSN 控制台：参考：<a class="reference external" href="https://bsnbase.com/static/tmpFile/bzsc/openper/7-2-1.html">7.2.1 链账户管理 · BSN</a></p>
+<p>批量充值接口：<a class="reference external" href="https://bsnbase.com/static/tmpFile/bzsc/openper/7-4-2.html">7.4.2 批量充值能量值 · BSN</a></p>
+</li>
+</ul>
+</li>
+<li><p>2.其他链账户代付授权：</p>
+<p><a class="reference external" href="https://github.com/bianjieai/opb-sdk-java#FeeGrant(%E4%BB%A3%E4%BB%98)%E6%A8%A1%E5%9D%97%E4%BD%BF%E7%94%A8">opb-sdk-Java 代付示例</a></p>
+<p><a class="reference external" href="https://github.com/bianjieai/opb-sdk-go/blob/master/test/feeGrant_test.go">opb-sdk-go 代付示例</a></p>
+</li>
+</ul>
+<p>第七步：参考底层链 API 说明文档，使用 opb-sdk 工具包与区块链进行交互，实现业务对接</p>
+<ul>
+<li><p>底层链 API 文档链接：</p>
+<p>Java 语言版本：<a class="reference external" href="https://github.com/bianjieai/opb-sdk-java">https://github.com/bianjieai/opb-sdk-java</a></p>
+<p>Go 语言版本：<a class="reference external" href="https://github.com/bianjieai/opb-sdk-go">https://github.com/bianjieai/opb-sdk-go</a></p>
+</li>
+</ul>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2022, minghui.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 5.3.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/second2.md.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
