@@ -15,8 +15,8 @@ release = 'v1.0'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-# extensions = ['myst_parser','chinese_search','sphinx.ext.mathjax','sphinx_sitemap', 'sphinx_multiversion']
-extensions = ['myst_parser']
+extensions = ['chinese_search', 'sphinx.ext.mathjax', 'sphinx_sitemap', 'sphinx_multiversion']
+# extensions = ['myst_parser']
 
 source_suffix = {
     '.rst': 'restructuredtext',
@@ -24,7 +24,7 @@ source_suffix = {
     '.md': 'markdown',
 }
 
-#templates_path = ['_templates']
+# templates_path = ['_templates']
 exclude_patterns = []
 
 language = 'zh_CN'
