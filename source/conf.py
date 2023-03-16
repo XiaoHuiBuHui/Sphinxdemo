@@ -37,7 +37,7 @@ language = 'zh_CN'
 # html_theme = 'furo'
 html_theme = 'sphinx_rtd_theme'
 templates_path = ['_templates']
-html_static_path = ['_static']
+#html_static_path = ['_static']
 html_sidebars = {
     '**': ['versions.html']
 }
